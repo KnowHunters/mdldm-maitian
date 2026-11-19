@@ -1,6 +1,6 @@
 # Docker 部署（统一 Chrome）
 
-这套部署用一个长期运行的 Chrome 容器保存各平台登录态。麦田中控通过 CDP 控制同一个 Chrome，PlayWriter Relay 也连接这个 Chrome。三者共享 cookies，不复制、不导入浏览器资料。
+这套部署用一个长期运行的 Chrome 容器保存各平台登录态。麦田中控通过 CDP 控制同一个 Chrome，PlayWriter Relay 控制同一个 Chrome。三者共享 cookies，不复制、不导入浏览器资料。
 
 ## 端口
 
@@ -43,7 +43,7 @@ docker compose ps
 docker compose logs -f chrome-unified
 ```
 
-`maitian` 与 `chrome-unified` 共用网络命名空间，因此 CDP 使用 `http://127.0.0.1:9222`。Chrome 的调试端口和 noVNC 只绑定本机，远程访问 noVNC 请用 SSH 隧道：
+`maitian`、`playwriter-relay` 与 `chrome-unified` 共用网络命名空间，因此 CDP 使用 `http://127.0.0.1:9222`。Chrome 的调试端口和 noVNC 只绑定本机，远程访问 noVNC 请用 SSH 隧道：
 
 ```bash
 ssh -L 6080:127.0.0.1:6080 root@192.168.123.11
@@ -69,7 +69,8 @@ http://127.0.0.1:19988
 ```bash
 docker exec chrome-unified node -v
 docker exec chrome-unified curl -fsS http://127.0.0.1:9222/json/version
-docker exec chrome-unified curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:19988/version
+docker exec playwriter-relay node -v
+docker exec playwriter-relay curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:19988/version
 docker exec maitian curl -fsS http://127.0.0.1:9222/json/version
 docker exec -it maitian node src/hub.mjs doctor
 ```

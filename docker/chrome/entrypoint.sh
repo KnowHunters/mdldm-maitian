@@ -6,7 +6,6 @@ DISPLAY_NUM=${DISPLAY_NUM:-99}
 VNC_PORT=${VNC_PORT:-6900}
 NOVNC_PORT=${NOVNC_PORT:-6080}
 CDP_PORT=${CDP_PORT:-9222}
-RELAY_PORT=${RELAY_PORT:-19988}
 
 mkdir -p "$PROFILE" /tmp/.X11-unix
 chown -R chrome:chrome "$PROFILE" /extensions 2>/dev/null || true
@@ -40,9 +39,5 @@ DISPLAY="${DISPLAY}" /usr/bin/google-chrome "${CHROME_ARGS[@]}" about:blank >/va
 
 x11vnc -display "${DISPLAY}" -nopw -forever -shared -rfbport "${VNC_PORT}" >/var/log/x11vnc.log 2>&1 &
 websockify --web=/usr/share/novnc "${NOVNC_PORT}" "localhost:${VNC_PORT}" >/var/log/websockify.log 2>&1 &
-
-if command -v npx >/dev/null 2>&1; then
-  npx -y playwriter@0.12.0 serve --host 0.0.0.0 --port "${RELAY_PORT}" --token "${PLAYWRITER_TOKEN:-maitian-local}" >/var/log/playwriter.log 2>&1 &
-fi
 
 wait

@@ -23,6 +23,33 @@ services:
       retries: 5
       start_period: 60s
 
+  playwriter-relay:
+    image: node:22-bookworm-slim
+    container_name: playwriter-relay
+    restart: unless-stopped
+    depends_on:
+      chrome-unified:
+        condition: service_healthy
+    network_mode: "service:chrome-unified"
+    environment:
+      TZ: Asia/Shanghai
+    command:
+      - npx
+      - -y
+      - playwriter@0.12.0
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "19988"
+      - --token
+      - ${PLAYWRITER_TOKEN:-maitian-local}
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: 3
+
   maitian:
     build: .
     container_name: maitian
