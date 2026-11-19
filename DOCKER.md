@@ -85,7 +85,7 @@ http://192.168.123.11:8789/?key=<MAITIAN_WEB_KEY>
 
 ## dtk
 
-`Douyin_TikTok_Download_API` 只提供数据读取，不是 cookies 来源，也不能替代浏览器登录。配置好 API key 后，抖音数据优先走 dtk；未配置时保留原来的页面采集方式。
+`Douyin_TikTok_Download_API` 只提供数据读取，不是 cookies 来源，也不能替代浏览器登录。默认不启用。需要时再在 `config.json` 填 `dtk.base` 和 `dtk.apiKey`；留空时麦田保留原来的页面采集方式。
 
 ```bash
 curl -H "X-API-Key: <key>" http://192.168.123.11:8000/api/v1/system/status

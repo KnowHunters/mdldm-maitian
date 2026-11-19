@@ -10,6 +10,7 @@ CDP_PORT=${CDP_PORT:-9222}
 mkdir -p "$PROFILE" /tmp/.X11-unix
 chown -R chrome:chrome "$PROFILE" /extensions 2>/dev/null || true
 rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
+rm -f "/tmp/.X${DISPLAY_NUM}-lock" "/tmp/.X11-unix/X${DISPLAY_NUM}"
 
 if ! pgrep -f "Xvfb :${DISPLAY_NUM}" >/dev/null; then
   Xvfb ":${DISPLAY_NUM}" -screen 0 1600x1000x24 -nolisten tcp >/var/log/xvfb.log 2>&1 &
