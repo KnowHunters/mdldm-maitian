@@ -13,6 +13,10 @@ RUN apt-get update \
  && useradd --create-home --shell /bin/bash chrome \
  && mkdir -p /chrome-profile /extensions
 
+RUN mkdir -p /etc/opt/chrome/policies/managed \
+ && printf '%s\n' '{"ExtensionInstallForcelist":["eaaipbilkhibicihiollecmbpneikpnj;https://clients2.google.com/service/update2/crx","jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' \
+    > /etc/opt/chrome/policies/managed/extensions.json
+
 COPY entrypoint.sh /usr/local/bin/maitian-chrome-entrypoint
 RUN chmod +x /usr/local/bin/maitian-chrome-entrypoint
 

@@ -49,12 +49,12 @@ docker compose logs -f chrome-unified
 ssh -L 6080:127.0.0.1:6080 root@192.168.123.11
 ```
 
-浏览器打开 `http://127.0.0.1:6080/`。在 Chrome 中安装：
+浏览器打开 `http://127.0.0.1:6080/`。Chrome 策略会在首次启动时自动安装这两个扩展：
 
 - 麦田发布助手：`eaaipbilkhibicihiollecmbpneikpnj`
 - PlayWriter：`jfeammnjpkecdekppnclgkkffahnhfhe`
 
-接着登录 B站、抖音、小红书、视频号、YouTube、X、Instagram 等平台。登录态写入 `maitian-chrome-profile` 数据卷，容器重启不会丢失。
+安装完成后，在统一 Chrome 中登录 B站、抖音、小红书、视频号、YouTube、X、Instagram 等平台。登录态写入 `maitian-chrome-profile` 数据卷，容器重启不会丢失。
 
 PlayWriter 扩展连接地址：
 
@@ -69,9 +69,11 @@ http://127.0.0.1:19988
 ```bash
 docker exec chrome-unified node -v
 docker exec chrome-unified curl -fsS http://127.0.0.1:9222/json/version
+docker exec chrome-unified sh -c 'find /chrome-profile/Default/Extensions -maxdepth 1 -mindepth 1 -type d'
 docker exec playwriter-relay node -v
 curl -fsS http://127.0.0.1:19988/version
 docker exec maitian curl -fsS http://127.0.0.1:9222/json/version
+docker exec maitian node src/hub.mjs doctor
 docker exec -it maitian node src/hub.mjs doctor
 ```
 
