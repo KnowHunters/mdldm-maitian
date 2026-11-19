@@ -28,8 +28,6 @@ mkdir -p projects
 MAITIAN_WEB_PORT=8789
 MAITIAN_WEB_KEY=<网页访问口令>
 PLAYWRITER_TOKEN=<PlayWriter Relay 口令>
-DTK_BASE=http://192.168.123.11:8000
-DTK_API_KEY=<dtk API key>
 MAITIAN_PROJECTS=./projects
 ```
 
@@ -67,14 +65,12 @@ http://127.0.0.1:19988
 ## 验收
 
 ```bash
-docker exec chrome-unified node -v
 docker exec chrome-unified curl -fsS http://127.0.0.1:9222/json/version
 docker exec chrome-unified sh -c 'find /chrome-profile/Default/Extensions -maxdepth 1 -mindepth 1 -type d'
-docker exec playwriter-relay node -v
 curl -fsS http://127.0.0.1:19988/version
+docker exec --env PLAYWRITER_HOST=http://127.0.0.1:19988 --env PLAYWRITER_TOKEN="maitian-pw-local-20261119" playwriter-relay playwriter browser list
 docker exec maitian curl -fsS http://127.0.0.1:9222/json/version
 docker exec maitian node src/hub.mjs doctor
-docker exec -it maitian node src/hub.mjs doctor
 ```
 
 麦田网页：
