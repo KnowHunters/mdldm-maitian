@@ -50,6 +50,8 @@
 
 ## 一行装好
 
+Docker（Linux 服务器，统一 Chrome + PlayWriter + 可选 dtk）见 [`DOCKER.md`](DOCKER.md)。原有 macOS / Windows 安装方式不受影响。
+
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/CzzzzzzJ/mdldm-maitian/main/scripts/install.sh)"
 ```

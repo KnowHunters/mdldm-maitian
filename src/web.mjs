@@ -50,7 +50,15 @@ function feed(n = 14) {
     return { ts: l.ts, episode: names[l.episode_id] || '', nick: nicks[l.episode_id] || '', platform: NAMES[l.platform] || l.platform || '', action: ACT[l.action] || l.action, result: STATE_CN[r] || String(r).slice(0, 40) };
   });
 }
-async function chromeUp() { try { const r = await fetch(`http://127.0.0.1:${config.chromePort || 9333}/json/version`, { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; } }
+async function chromeUp() {
+  const candidates = [];
+  if (process.env.CDP_URL || config.cdpUrl) candidates.push(`${(process.env.CDP_URL || config.cdpUrl).replace(/\/$/, '')}/json/version`);
+  candidates.push(`http://127.0.0.1:${config.chromePort || 9333}/json/version`);
+  for (const url of candidates) {
+    try { const r = await fetch(url, { signal: AbortSignal.timeout(800) }); if (r.ok) return true; } catch {}
+  }
+  return false;
+}
 
 function widgetScript(req, file) {
   let base = `${req.headers['x-forwarded-proto'] || (req.headers['cf-visitor'] ? 'https' : 'http')}://${req.headers.host}`;

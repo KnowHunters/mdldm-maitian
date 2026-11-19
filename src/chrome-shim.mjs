@@ -22,7 +22,16 @@ let nextTab = 1000;
 
 const cdpBase = () => CDP_URL.replace(/\/$/, '');
 const versionUrl = () => REMOTE ? `${cdpBase()}/json/version` : `http://127.0.0.1:${PORT}/json/version`;
-const version = () => fetch(versionUrl(), { signal: AbortSignal.timeout(2000) }).then(r => r.json());
+async function version() {
+  const r = await fetch(versionUrl(), { signal: AbortSignal.timeout(2000) });
+  const data = await r.json();
+  if (REMOTE && data.webSocketDebuggerUrl) {
+    const sock = new URL(data.webSocketDebuggerUrl);
+    sock.host = new URL(cdpBase()).host;
+    data.webSocketDebuggerUrl = sock.toString();
+  }
+  return data;
+}
 
 // 启动专用 Chrome（已经在跑就直接用）。foreground=true 时把窗口带到前台（登录用）
 export async function launchChrome({ foreground = false } = {}) {

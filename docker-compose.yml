@@ -30,27 +30,26 @@ services:
     depends_on:
       chrome-unified:
         condition: service_healthy
+    network_mode: "service:chrome-unified"
     environment:
       TZ: Asia/Shanghai
       MAITIAN_CONFIG: /data/maitian/config.json
       MAITIAN_DB: /data/maitian/hub.db
       CHROME_PROFILE: /data/chrome-profile
-      CDP_URL: http://chrome-unified:9222
+      CDP_URL: http://127.0.0.1:9222
       MAITIAN_WEB_PORT: ${MAITIAN_WEB_PORT:-8789}
       MAITIAN_WEB_KEY: ${MAITIAN_WEB_KEY:-maitian-8789-local-20261119}
-      DTK_BASE: ${DTK_BASE:-http://dtk-api-1:8000}
+      DTK_BASE: ${DTK_BASE:-http://192.168.123.11:8000}
       DTK_API_KEY: ${DTK_API_KEY:-maitian-dtk-local-20261119}
     volumes:
       - ./config.json:/data/maitian/config.example.json:ro
       - maitian-data:/data/maitian
       - chrome-profile:/data/chrome-profile:ro
       - ${MAITIAN_PROJECTS:-./projects}:/data/projects:rw
-    ports:
-      - "${MAITIAN_WEB_PORT:-8789}:8789"
     command:
       - /bin/sh
       - -c
-      - node scripts/prepare-config.mjs /data/maitian/config.json && exec node src/hub.mjs daemon
+      - node scripts/prepare-config.mjs /data/maitian/config.example.json /data/maitian/config.json && exec node src/hub.mjs daemon
     logging:
       driver: json-file
       options:
