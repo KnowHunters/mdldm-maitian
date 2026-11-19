@@ -16,6 +16,7 @@ services:
       - "127.0.0.1:9222:9222"
       - "127.0.0.1:6080:6080"
       - "127.0.0.1:19988:19988"
+      - "${MAITIAN_WEB_PORT:-8789}:8789"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9222/json/version >/dev/null"]
       interval: 30s
@@ -34,16 +35,9 @@ services:
     environment:
       TZ: Asia/Shanghai
     command:
-      - npx
-      - -y
-      - playwriter@0.12.0
-      - serve
-      - --host
-      - 0.0.0.0
-      - --port
-      - "19988"
-      - --token
-      - ${PLAYWRITER_TOKEN:-maitian-local}
+      - /bin/sh
+      - -c
+      - exec npx -y playwriter@0.12.0 serve --host 0.0.0.0 --port 19988 --token "$PLAYWRITER_TOKEN"
     logging:
       driver: json-file
       options:
