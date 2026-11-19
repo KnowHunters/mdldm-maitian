@@ -10,6 +10,7 @@ RELAY_PORT=${RELAY_PORT:-19988}
 
 mkdir -p "$PROFILE" /tmp/.X11-unix
 chown -R chrome:chrome "$PROFILE" /extensions 2>/dev/null || true
+rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
 
 if ! pgrep -f "Xvfb :${DISPLAY_NUM}" >/dev/null; then
   Xvfb ":${DISPLAY_NUM}" -screen 0 1600x1000x24 -nolisten tcp >/var/log/xvfb.log 2>&1 &
