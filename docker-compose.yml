@@ -41,7 +41,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - exec npx -y playwriter serve --host 0.0.0.0 --token "$PLAYWRITER_TOKEN"
+      - exec npx -y playwriter@0.12.0 serve --host 0.0.0.0 --token "$PLAYWRITER_TOKEN"
     logging:
       driver: json-file
       options:
