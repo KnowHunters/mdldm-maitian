@@ -70,7 +70,7 @@ http://127.0.0.1:19988
 docker exec chrome-unified node -v
 docker exec chrome-unified curl -fsS http://127.0.0.1:9222/json/version
 docker exec playwriter-relay node -v
-docker exec playwriter-relay curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:19988/version
+curl -fsS http://127.0.0.1:19988/version
 docker exec maitian curl -fsS http://127.0.0.1:9222/json/version
 docker exec -it maitian node src/hub.mjs doctor
 ```
