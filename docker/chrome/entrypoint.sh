@@ -42,7 +42,7 @@ x11vnc -display "${DISPLAY}" -nopw -forever -shared -rfbport "${VNC_PORT}" >/var
 websockify --web=/usr/share/novnc "${NOVNC_PORT}" "localhost:${VNC_PORT}" >/var/log/websockify.log 2>&1 &
 
 if command -v npx >/dev/null 2>&1; then
-  PLAYWRITER_TOKEN="${PLAYWRITER_TOKEN:-maitian-local}" npx -y playwriter@latest serve --host 0.0.0.0 --port "${RELAY_PORT}" --token "${PLAYWRITER_TOKEN:-maitian-local}" >/var/log/playwriter.log 2>&1 &
+  npx -y playwriter@latest serve --host 0.0.0.0 --port "${RELAY_PORT}" --token "${PLAYWRITER_TOKEN:-maitian-local}" >/var/log/playwriter.log 2>&1 &
 fi
 
 wait
