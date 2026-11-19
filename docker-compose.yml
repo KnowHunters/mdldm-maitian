@@ -13,7 +13,8 @@ services:
     volumes:
       - chrome-profile:/chrome-profile
       - ./docker/chrome/extensions-policy.json:/etc/opt/chrome/policies/managed/extensions.json:ro
-      - ./docker/chrome/entrypoint.sh:/usr/local/bin/maitian-chrome-entrypoint:ro
+      - ./docker/chrome/launch-wrapper.sh:/usr/local/bin/maitian-chrome-launch:ro
+    entrypoint: ["/usr/local/bin/maitian-chrome-launch"]
     ports:
       - "127.0.0.1:9222:9222"
       - "127.0.0.1:6080:6080"
