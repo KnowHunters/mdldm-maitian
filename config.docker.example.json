@@ -1,0 +1,23 @@
+{
+  "name": "麦田",
+  "plugin": "store",
+  "driver": "direct",
+  "learnLinks": false,
+  "cdpUrl": "http://chrome-unified:9222",
+  "chromeProfile": "/data/chrome-profile",
+  "rootPath": "/data/projects",
+  "batches": [["bilibili", "douyin"], ["xhs", "channels"], ["zsz", "x"], ["youtube"], ["instagram"]],
+  "auto": ["zsz", "x", "youtube", "instagram"],
+  "manual": ["bilibili", "douyin", "xhs", "channels"],
+  "keepAlive": ["channels"],
+  "keepAliveMinutes": 60,
+  "sampleHours": 6,
+  "web": {
+    "port": 8789,
+    "key": "CHANGE_ME"
+  },
+  "dtk": {
+    "base": "http://dtk-api-1:8000",
+    "apiKey": ""
+  }
+}

@@ -6,9 +6,12 @@ import { config } from './feishu.mjs';
 
 const PORT = config.chromePort || 9333;
 export const PROFILE = (config.chromeProfile || '~/publish-hub/chrome-profile').replace(/^~/, os.homedir());
-const BIN = process.platform === 'win32'
+const LOCAL_BIN = process.platform === 'win32'
   ? (['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'Application', 'chrome.exe')].find(p => fs.existsSync(p)) || 'chrome.exe')
   : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const BIN = config.chromeBinary || process.env.CHROME_BINARY || LOCAL_BIN;
+const CDP_URL = process.env.CDP_URL || config.cdpUrl || '';
+const REMOTE = !!CDP_URL;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 let ws = null, seq = 0;
@@ -17,11 +20,14 @@ const tabs = new Map();               // tabId -> {targetId, sessionId}
 const byTarget = new Map();           // targetId -> tabId
 let nextTab = 1000;
 
-const version = () => fetch(`http://127.0.0.1:${PORT}/json/version`, { signal: AbortSignal.timeout(2000) }).then(r => r.json());
+const cdpBase = () => CDP_URL.replace(/\/$/, '');
+const versionUrl = () => REMOTE ? `${cdpBase()}/json/version` : `http://127.0.0.1:${PORT}/json/version`;
+const version = () => fetch(versionUrl(), { signal: AbortSignal.timeout(2000) }).then(r => r.json());
 
 // 启动专用 Chrome（已经在跑就直接用）。foreground=true 时把窗口带到前台（登录用）
 export async function launchChrome({ foreground = false } = {}) {
   try { await version(); } catch {
+    if (REMOTE) throw new Error(`连不上远程 Chrome：${versionUrl()}`);
     fs.mkdirSync(PROFILE, { recursive: true });
     const args = [`--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`, '--no-first-run', '--no-default-browser-check',
       '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--window-size=1500,1000'];

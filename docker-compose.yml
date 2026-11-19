@@ -1,0 +1,56 @@
+name: maitian
+
+services:
+  chrome-unified:
+    build: ./docker/chrome
+    container_name: chrome-unified
+    restart: unless-stopped
+    init: true
+    shm_size: 2gb
+    environment:
+      TZ: Asia/Shanghai
+      PLAYWRITER_TOKEN: ${PLAYWRITER_TOKEN:-maitian-local}
+    volumes:
+      - chrome-profile:/chrome-profile
+    ports:
+      - "127.0.0.1:9222:9222"
+      - "127.0.0.1:6080:6080"
+      - "127.0.0.1:19988:19988"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9222/json/version >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  maitian:
+    build: .
+    container_name: maitian
+    restart: unless-stopped
+    depends_on:
+      chrome-unified:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      MAITIAN_CONFIG: /data/maitian/config.json
+      MAITIAN_DB: /data/maitian/hub.db
+      CHROME_PROFILE: /data/chrome-profile
+      CDP_URL: http://chrome-unified:9222
+    volumes:
+      - ./config.json:/data/maitian/config.json:ro
+      - maitian-data:/data/maitian
+      - chrome-profile:/data/chrome-profile:ro
+      - ${MAITIAN_PROJECTS:-./projects}:/data/projects:rw
+    ports:
+      - "${MAITIAN_WEB_PORT:-8789}:8789"
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: 3
+
+volumes:
+  chrome-profile:
+    name: maitian-chrome-profile
+  maitian-data:
+    name: maitian-data

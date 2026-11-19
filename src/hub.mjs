@@ -287,6 +287,11 @@ async function doctor() {
 
 // NAS 没挂上就试着挂一次（用钥匙串里存的密码），返回是否可读
 async function ensureNas() {
+  if (process.platform !== 'darwin') {
+    const ok = () => { try { fs.accessSync(config.rootPath); return true; } catch { return false; } };
+    if (!ok()) try { fs.mkdirSync(config.rootPath, { recursive: true }); } catch {}
+    return ok();
+  }
   const ok = () => { try { fs.accessSync(config.rootPath); return true; } catch { return false; } };
   if (ok()) return true;
   // 2026-11-14：NAS 掉线重连后，macOS 有时把它挂到「…-1」，原路径就读不到了（封面全挂、NAS 灯变红）。

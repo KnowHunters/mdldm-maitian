@@ -1,6 +1,7 @@
 // 流量采集：只读自己创作者后台的数据，每天一次。按作品 ID 匹配（标题在平台上可能改过）。
 import { evaluate, withTab, sleep } from './driver.mjs';
 import { SITE } from './site.mjs';
+import { dtkEnabled, dtkVideo } from './dtk.mjs';
 
 const J = JSON.stringify;
 // "1.2万" "6,017" "5.3K" → 数字
@@ -25,6 +26,10 @@ export const collectors = {
     return n && n.length >= 5 && { views: num(n[0]), comments: num(n[1]), likes: num(n[2]), favorites: num(n[3]), shares: num(n[4]) };
   },
   async douyin({ url, p }) {
+    if (dtkEnabled()) {
+      const dtk = await dtkVideo('douyin', { url, id: idOf(url, /video\/(\d+)/) }).catch(() => null);
+      if (dtk && dtk.views != null) return dtk;
+    }
     const id = idOf(url, /video\/(\d+)/);
     const st = await withTab('https://creator.douyin.com/creator-micro/content/manage', async (t) => { for (let i = 0; i < 15 && !(await evaluate(t, `document.querySelectorAll('[class*=video-card-info]').length`).catch(() => 0)); i++) await sleep(2000); await sleep(1500); return evaluate(t, `(()=>{for(const c of document.querySelectorAll('[class*=video-card-info]')){const k=Object.keys(c).find(k=>k.startsWith('__reactFiber'));let f=c[k];for(let i=0;i<25&&f;i++,f=f.return){const pr=f.memoizedProps;if(!pr)continue;const v=Object.values(pr).find(v=>v&&typeof v==='object'&&v.aweme_id&&v.desc!==undefined);if(v){if((${J(id)}&&v.aweme_id===${J(id)})||v.item_title===${J(p.title)})return v.statistics||null;break;}}}return null})()`); }, { wait: 6000 });
     return st && { views: st.play_count, likes: st.digg_count, comments: st.comment_count, favorites: st.collect_count, shares: st.share_count };

@@ -98,7 +98,8 @@ function thumb(f, w) {
     const out = path.join(dir, crypto.createHash('sha1').update(`${f}|${st.mtimeMs}|${w}`).digest('hex') + '.jpg');
     if (fs.existsSync(out)) return out;
     fs.mkdirSync(dir, { recursive: true });
-    execFileSync('/usr/bin/sips', ['-Z', String(w), '-s', 'format', 'jpeg', '-s', 'formatOptions', '78', f, '--out', out], { stdio: 'ignore', timeout: 20000 });
+    if (fs.existsSync('/usr/bin/sips')) execFileSync('/usr/bin/sips', ['-Z', String(w), '-s', 'format', 'jpeg', '-s', 'formatOptions', '78', f, '--out', out], { stdio: 'ignore', timeout: 20000 });
+    else execFileSync('convert', [f, '-auto-orient', '-resize', `${w}x${w}>`, '-quality', '78', out], { stdio: 'ignore', timeout: 20000 });
     return fs.existsSync(out) ? out : null;
   } catch { return null; }
 }
