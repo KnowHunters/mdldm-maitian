@@ -27,13 +27,15 @@ CHROME_ARGS=(
   --remote-debugging-port="${CDP_PORT}"
   --window-size=1500,1000
   --disable-dev-shm-usage
+  --no-sandbox
+  --disable-setuid-sandbox
   --lang=zh-CN
 )
 if [ -n "${PLAYWRITER_EXTENSION_PATH:-}" ] && [ -d "${PLAYWRITER_EXTENSION_PATH}" ]; then
   CHROME_ARGS+=(--disable-extensions-except="${PLAYWRITER_EXTENSION_PATH}" --load-extension="${PLAYWRITER_EXTENSION_PATH}")
 fi
 
-su chrome -s /bin/bash -c "DISPLAY='${DISPLAY}' '/usr/bin/google-chrome' $(printf '%q ' "${CHROME_ARGS[@]}") about:blank" >/var/log/chrome.log 2>&1 &
+DISPLAY="${DISPLAY}" /usr/bin/google-chrome "${CHROME_ARGS[@]}" about:blank >/var/log/chrome.log 2>&1 &
 
 x11vnc -display "${DISPLAY}" -nopw -forever -shared -rfbport "${VNC_PORT}" >/var/log/x11vnc.log 2>&1 &
 websockify --web=/usr/share/novnc "${NOVNC_PORT}" "localhost:${VNC_PORT}" >/var/log/websockify.log 2>&1 &
