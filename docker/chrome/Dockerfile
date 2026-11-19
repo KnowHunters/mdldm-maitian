@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils xvfb x11vnc novnc websockify fluxbox procps lsof \
  && ARCH="$(dpkg --print-architecture)" \
- && NODE_VERSION=v22.22.0 \
+ && NODE_VERSION=v22.23.5 \
  && curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-${ARCH}.tar.xz" -o /tmp/node.tar.xz \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
  && rm -f /tmp/node.tar.xz \
