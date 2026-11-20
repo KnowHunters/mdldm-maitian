@@ -105,7 +105,8 @@ node src/hub.mjs doctor                 # 登录完检查各平台登录态和�
 - **日历**：上周到未来两周，已发布、已定时、等你点、计划中的期一眼看清。
 - **粮仓（档案）**：每期的封面、文案快照、各平台链接、过程日志。
 - **复盘（数据分析）**：每期发布后第 1/3/7 天自动出复盘卡片：各平台占比、互动率、和上一期同龄对比（第 N 天对第 N 天）、期间涨粉、带来的注册；每周一出周报。网页单期页有同一份复盘表，转化页有每期转化漏斗（播放 → 注册 → 会员 → 收入）。
-- **飞书通知**：开跑、每个平台到位、异常、等你点发布、定时被平台改掉、每日日报、复盘和周报，都是带颜色的卡片。
+- **飞书通知**：开跑、每个平台到位、异常、等你点发布、定时被平台改掉、每日日报、复盘和周报，都是带颜色的卡片。webhook 和「飞书验证码登录」开关可以在网页「系统 → 集成」里编辑、测试，保存即生效。
+- **平台管理**：网页「系统 → 平台」列出每个平台的登录状态（体检结果），掉线了点「去登录」只打开这一家的后台；「全部检查」就是一次体检。不用的平台可以停用（不体检、不发布、不采粉丝），会写进 `config.json` 的 `disabled`。同一个平台登多个账号、在网页里嵌扫码做不到：登录态在专用 Chrome 的 profile 里，一个平台只有一份。
 
 ## 各平台的坑（实战总结）
 
@@ -141,6 +142,8 @@ publish.json ─▶│     │  ▲                 ▲                       �
 <summary><b>命令</b></summary>
 
 ```bash
+node src/hub.mjs login [--only bilibili,channels]   # 打开专用 Chrome 登录页（不带 --only = 全开；网页「系统 → 平台」按平台打开）
+node src/hub.mjs doctor [--only a,b] [--quiet]      # 体检登录态，结果给网页用；--quiet 不发飞书
 node src/hub.mjs plan [工程目录]            # 登记进分发计划（不带目录 = 扫描 rootPath）
 node src/hub.mjs run <工程目录> [--only x,zsz] [--force] [--now]   # 发一期；--now 让站点课程立即上线（默认推迟到定时前 30 分钟）
 node src/hub.mjs status [id] [--logs]
@@ -167,6 +170,7 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 | `batches` | 上传批次。一次传太多平台会互相抢带宽导致超时，建议国内两两一批 |
 | `auto` / `manual` | 自动提交 / 等你点发布的平台 |
 | `keepAlive` | 容易掉登录的平台（视频号），定时刷一下保活 |
+| `disabled` | 停用的平台（如 `["instagram"]`）：不体检、不打开登录页、不发布、不采粉丝。网页「系统 → 平台」里也能开关 |
 | `site` | 自有站点，可选，见下 |
 | `board` | 飞书多维表格看板，可选 |
 | `web.key` | 网页口令，所有页面和接口没有口令一律 401 |
@@ -180,7 +184,7 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 
 1. 发布 skill 会在 B站、YouTube、X 的链接上带 `utm_campaign=<主题>-<序号>`；你的站点记下访客第一次带来的这个参数，注册和下单时一起存。
 2. 站点提供两个只读接口给麦田（用专用 Chrome 里的管理员登录态去调），字段见 [`src/site.mjs`](src/site.mjs) 顶部注释。
-3. 在 `config.site` 里填站点地址和接口路径。
+3. 在 `config.site` 里填站点地址和接口路径。也可以直接在网页「系统 → 集成」里编辑、点「测试连接」，保存即生效（不用重启守护进程）。
 
 作者用自己的课程站做了示例；你的站结构不同，改 `src/site.mjs` 和转化页即可。
 
@@ -192,7 +196,7 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 `scripts/install-launchd.sh --tunnel` 会装一个 cloudflared 隧道，地址推到飞书。
 
 - **固定域名（推荐）**：域名交给 Cloudflare 后，跑 `cloudflared tunnel login`、`cloudflared tunnel create maitian`、`cloudflared tunnel route dns maitian maitian.你的域名`，在 `config.json` 里加 `"tunnel": { "name": "maitian", "hostname": "maitian.你的域名" }`。地址永远不变，建议再在 Cloudflare Zero Trust 里给它加一层邮箱验证码登录（Access → Self-hosted 应用），然后在 `config.json` 的 `web.access` 填团队域名和应用的 AUD Tag：麦田会验证 Access 签发的登录凭证，手机上输邮箱收验证码就能进，不用再带 `?key=`。
-- **飞书验证码登录（推荐，零配置）**：`config.json` 的 `web` 里加 `"login": "feishu"`。远程打开麦田会先到登录页，点「发送验证码」，6 位码推到飞书群，输入后这台设备记住 30 天；验证码 5 分钟有效、只能用一次、错 5 次作废，60 秒内只能发一次。`?key=` 口令仍可用作备用。
+- **飞书验证码登录（推荐，零配置）**：`config.json` 的 `web` 里加 `"login": "feishu"`。远程打开麦田会先到登录页，点「发送验证码」，6 位码推到飞书群，输入后这台设备记住 30 天；验证码 5 分钟有效、只能用一次、错 5 次作废，60 秒内只能发一次。`?key=` 口令仍可用作备用。飞书 webhook 和这个开关也能在网页「系统 → 集成」里编辑、点「测试发送」，保存即生效。
 - **快速隧道（默认）**：不配 `tunnel` 时用 `https://xxx.trycloudflare.com`，不用账号，但每次重启地址都会变。
 
 </details>
