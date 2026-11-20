@@ -2,7 +2,10 @@ import fs from 'node:fs';
 
 const source = process.argv[2] || process.argv[3] || '/data/maitian/config.json';
 const file = process.argv[3] || source;
-const cfg = JSON.parse(fs.readFileSync(source, 'utf8'));
+const read = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+const existing = read(file);
+const cfg = existing || read(source) || {};
+if (!existing && fs.existsSync(source)) fs.copyFileSync(source, file);
 cfg.web = cfg.web || {};
 cfg.web.port = Number(process.env.MAITIAN_WEB_PORT || cfg.web.port || 8789);
 cfg.web.key = process.env.MAITIAN_WEB_KEY || cfg.web.key || 'CHANGE_ME';

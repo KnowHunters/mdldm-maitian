@@ -11,10 +11,22 @@
   "manual": ["bilibili", "douyin", "xhs", "channels"],
   "keepAlive": ["channels"],
   "keepAliveMinutes": 60,
+  "disabled": [],
   "sampleHours": 6,
   "web": {
     "port": 8789,
     "key": "CHANGE_ME"
+  },
+  "feishuWebhook": "",
+  "site": {
+    "name": "知识站",
+    "enabled": false,
+    "base": "",
+    "adminPath": "/admin",
+    "coursesApi": "/api/courses?admin=1",
+    "dashboardApi": "/api/admin/dashboard",
+    "coursePath": "/series/{seriesId}?courseId={id}",
+    "logo": ""
   },
   "dtk": {
     "base": "",

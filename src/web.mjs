@@ -1,21 +1,25 @@
 // 麦田：本地网页。播种（发布）、长势（流量）、收成（转化）、粮仓（档案）
 import http from 'node:http'; import crypto from 'node:crypto'; import fs from 'node:fs'; import path from 'node:path'; import { spawn, execFileSync } from 'node:child_process'; import { fileURLToPath } from 'node:url';
-import { db, NAMES, STATE_CN, episodes, getEpisode, getTasks, recentLogs, getSnapshot, getMeta } from './db.mjs';
-import { config } from './feishu.mjs';
-import { SITE } from './site.mjs';
+import { db, NAMES, STATE_CN, episodes, getEpisode, getTasks, recentLogs, getSnapshot, getMeta, setMeta } from './db.mjs';
+import { config, testFeishu } from './feishu.mjs';
+import { SITE, siteOn, refreshSite } from './site.mjs';
+import { applyFeishuPatch, applySitePatch, saveConfig, testSite } from './config-admin.mjs';
 import { learnOn, learnUrl } from './learn.mjs';
 import { review } from './review.mjs';
 import { accessEmail } from './access.mjs';
 import { initLogin, sessionOk, handleLogin } from './login.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(DIR, '..');
-const W = config.web || { port: 8787, key: '' };
+let W = config.web || { port: 8787, key: '' };
 const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store', ...extra }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
 const readPj = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'publish.json'), 'utf8')); } catch { return null; } };
 const short = (n) => n.split(/[｜|]/)[0].trim();
 const nickOf = (name, pj) => (pj && pj.nick) || (short(name).split(/[，,？?！!：:。]/)[0].trim() || short(name)).slice(0, 16);
 const latest = db.prepare('SELECT * FROM metrics WHERE episode_id=? AND platform=? ORDER BY day DESC LIMIT 1');
 const actions = [];   // 最近的操作（内存里）
+const PLATFORMS = ['bilibili', 'douyin', 'xhs', 'channels', 'youtube', 'x', 'instagram'];
+const CFG = process.env.MAITIAN_CONFIG || path.join(ROOT, 'config.json');
+const platformList = () => PLATFORMS.map(id => ({ id, name: NAMES[id] || id, state: getMeta(`login:${id}`) || '', reason: getMeta(`loginReason:${id}`) || '', day: getMeta(`loginDay:${id}`) || '', disabled: (config.disabled || []).includes(id) }));
 
 function episodeView(ep, full = false) {
   const snap = getSnapshot(ep.id), pj = (snap && JSON.parse(snap.project)) || readPj(ep.dir) || { platforms: {} };
@@ -42,7 +46,7 @@ function episodeView(ep, full = false) {
   return out;
 }
 
-const ACT = { links: '取链接', mark: '标记', 'login-expired': '登录过期', upload: '上传', fill: '填写', submit: '提交', verify: '核对' };
+const ACT = { links: '取链接', mark: '标记', 'login-expired': '登录过期', upload: '上传', fill: '填写', submit: '提交', verify: '核对', state: '状态', 'start-batch': '开跑', plan: '登记计划', 'manual-submit': '手动提交', 'metrics-error': '采集出错', 'screenshot-error': '截图失败', 'article-job': '长文', 'deferred-run': '自动建课' };
 function feed(n = 14) {
   const names = Object.fromEntries(episodes().map(e => [e.id, e.episode])), nicks = Object.fromEntries(episodes().map(e => [e.id, nickOf(e.name, readPj(e.dir))]));
   return db.prepare('SELECT * FROM logs ORDER BY id DESC LIMIT ?').all(n).map(l => {
@@ -190,6 +194,27 @@ function thumb(f, w) {
   } catch { return null; }
 }
 
+const metaJson = (k) => { const v = getMeta(k); if (!v) return null; try { return JSON.parse(v); } catch { return null; } };
+function integrations() {
+  const cs = config.site || {};
+  const summary = SITE ? (() => {
+    const rows = db.prepare("SELECT day, reg, revenue FROM site_daily WHERE day >= date('now','localtime','-7 day')").all();
+    return { reg: rows.reduce((n, r) => n + (r.reg || 0), 0), revenue: rows.reduce((n, r) => n + (r.revenue || 0), 0) };
+  })() : null;
+  return {
+    feishu: { webhook: config.feishuWebhook || '', login: W.login === 'feishu', lastTest: metaJson('integrations.feishu.lastTest') },
+    site: {
+      enabled: siteOn(), name: cs.name || '', base: cs.base || '',
+      adminPath: cs.adminPath || '/admin', coursesApi: cs.coursesApi || '/api/courses?admin=1',
+      dashboardApi: cs.dashboardApi || '/api/admin/dashboard', coursePath: cs.coursePath || '/series/{seriesId}?courseId={id}',
+      logo: cs.logo || '', lastTest: metaJson('integrations.site.lastTest'), summary,
+    },
+  };
+}
+const readJson = (req) => new Promise((res, rej) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 20000) req.destroy(); }); req.on('end', () => { try { res(JSON.parse(b || '{}')); } catch { res({}); } }); req.on('error', rej); });
+const snapConfig = () => JSON.parse(JSON.stringify(config));
+const rollbackConfig = (backup) => { for (const k of Object.keys(config)) delete config[k]; Object.assign(config, backup); };
+
 async function handle(req, res) {
   const u = new URL(req.url, 'http://x');
   // 访问控制：前面挂了 Cloudflare Access（邮箱验证码）就认它的登录凭证；否则用口令（第一次带 ?key= 进来，之后用 cookie）
@@ -232,9 +257,55 @@ async function handle(req, res) {
       metrics: db.prepare('SELECT day, episode_id, platform, views FROM metrics ORDER BY day').all(),
       followers: db.prepare("SELECT day, platform, total, gain, loss, source FROM followers WHERE day >= date('now','localtime','-40 day') ORDER BY day").all(),
       samples: db.prepare('SELECT ts, episode_id, platform, views FROM samples ORDER BY ts').all(),
-      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), vnc: await chromeVncUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || '']) ) }, now: new Date().toISOString() });
+      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), vnc: await chromeVncUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || ''])), platforms: platformList() }, now: new Date().toISOString() });
   }
   if (u.pathname === '/site-logo') { const f = SITE && config.site.logo && path.resolve(ROOT, config.site.logo); return f && fs.existsSync(f) ? send(res, 200, fs.readFileSync(f), /\.svg$/.test(f) ? 'image/svg+xml' : /\.jpe?g$/.test(f) ? 'image/jpeg' : 'image/png', { 'cache-control': 'max-age=3600' }) : send(res, 404, ''); }
+  if (u.pathname === '/api/integrations' && req.method === 'GET') return send(res, 200, integrations());
+  if (u.pathname === '/api/integrations/feishu' && req.method === 'POST') {
+    const a = await readJson(req), backup = snapConfig();
+    try { applyFeishuPatch(config, { webhook: String(a.webhook ?? ''), login: a.login === true }); saveConfig(config); }
+    catch (e) { rollbackConfig(backup); return /先填 webhook/.test(e.message) ? send(res, 400, { error: e.message }) : send(res, 500, { error: '写配置失败：' + e.message }); }
+    W = config.web || W;
+    return send(res, 200, { feishu: integrations().feishu });
+  }
+  if (u.pathname === '/api/integrations/site' && req.method === 'POST') {
+    const a = await readJson(req), backup = snapConfig();
+    try {
+      applySitePatch(config, { enabled: a.enabled === undefined ? undefined : a.enabled === true, name: a.name, base: a.base, adminPath: a.adminPath, coursesApi: a.coursesApi, dashboardApi: a.dashboardApi, coursePath: a.coursePath, logo: a.logo });
+      saveConfig(config);
+    } catch (e) {
+      rollbackConfig(backup);
+      const msg = e.message || '';
+      return send(res, /先填站点地址/.test(msg) ? 400 : 500, { error: /先填站点地址/.test(msg) ? msg : ('写配置失败：' + msg) });
+    }
+    refreshSite();
+    return send(res, 200, { site: integrations().site });
+  }
+  if (u.pathname === '/api/integrations/feishu/test' && req.method === 'POST') {
+    const a = await readJson(req);
+    const r = await testFeishu(a.webhook === undefined ? config.feishuWebhook : String(a.webhook).trim());
+    setMeta('integrations.feishu.lastTest', JSON.stringify({ ...r, ts: new Date().toISOString() }));
+    return send(res, 200, r);
+  }
+  if (u.pathname === '/api/integrations/site/test' && req.method === 'POST') {
+    const a = await readJson(req);
+    const r = await testSite({ base: a.base, adminPath: a.adminPath, coursesApi: a.coursesApi, dashboardApi: a.dashboardApi });
+    setMeta('integrations.site.lastTest', JSON.stringify({ ...r, ts: new Date().toISOString() }));
+    return send(res, 200, r);
+  }
+  if (u.pathname === '/api/platform-toggle' && req.method === 'POST') {
+    let body = ''; req.on('data', d => body += d); req.on('end', () => {
+      let a; try { a = JSON.parse(body); } catch { return send(res, 400, { error: '请求格式不对' }); }
+      const id = a.platform, on = a.on !== false;
+      if (!PLATFORMS.includes(id)) return send(res, 400, { error: '平台不对' });
+      const cur = new Set(config.disabled || []); on ? cur.delete(id) : cur.add(id);
+      config.disabled = [...cur].sort();
+      try { if (fs.existsSync(CFG)) fs.copyFileSync(CFG, CFG + '.bak'); fs.writeFileSync(CFG, JSON.stringify(config, null, 2) + '\n'); }
+      catch (e) { config.disabled = [...(new Set(JSON.parse(fs.readFileSync(CFG, 'utf8')).disabled || []))].sort(); return send(res, 500, { error: '写配置失败：' + e.message }); }
+      send(res, 200, { ok: true, disabled: config.disabled });
+    });
+    return;
+  }
   if (u.pathname === '/api/episode') { const ep = getEpisode(u.searchParams.get('id')); return ep ? send(res, 200, episodeView(ep, true)) : send(res, 404, { error: '没有这一期' }); }
   if (u.pathname === '/cover' || u.pathname === '/shot') {
     const ep = getEpisode(u.searchParams.get('id')); if (!ep) return send(res, 404, '');
@@ -249,13 +320,16 @@ async function handle(req, res) {
   if (u.pathname === '/api/action' && req.method === 'POST') {
     let body = ''; req.on('data', d => body += d); req.on('end', () => {
       let a; try { a = JSON.parse(body); } catch { return send(res, 400, { error: '请求格式不对' }); }
-      const map = { sync: ['sync', a.id], metrics: a.id ? ['metrics', a.id] : ['metrics'], doctor: ['doctor', '--notify'], board: ['board'], followers: ['followers'],
+      const map = { sync: ['sync', a.id], metrics: a.id ? ['metrics', a.id] : ['metrics'],
+        doctor: ['doctor', ...(a.platform && PLATFORMS.includes(a.platform) ? ['--only', a.platform, '--quiet'] : ['--notify'])],
+        board: ['board'], followers: ['followers'],
+        login: ['login', ...(a.platform && PLATFORMS.includes(a.platform) ? ['--only', a.platform] : [])],
         mark: ['mark', a.id, a.platform, a.state, a.note || '在麦田里标记', ...(a.url ? ['--url', a.url] : [])] };
       const argv = map[a.type];
       if (!argv || argv.some(x => x === undefined || x === null || x === '')) return send(res, 400, { error: '不支持的操作' });
       if (a.type === 'mark' && (a.state !== 'published' || !getEpisode(a.id) || !NAMES[a.platform])) return send(res, 400, { error: '状态不对' });
-      if (actions.some(x => !x.done && x.type !== 'mark') && a.type !== 'mark') return send(res, 409, { error: '上一个操作还在跑，等它结束' });
-      const rec = { type: a.type, label: { sync: '取链接', metrics: '采流量', doctor: '体检', board: '同步知识站数据', followers: '采粉丝', mark: '标记状态', retry: '重跑平台' }[a.type] + (a.platform ? ` · ${NAMES[a.platform] || a.platform}` : ''), startedAt: new Date().toISOString(), done: false, ok: null, tail: '' };
+      if (actions.some(x => !x.done && x.type !== 'mark') && !['mark', 'login'].includes(a.type)) return send(res, 409, { error: '上一个操作还在跑，等它结束' });
+      const rec = { type: a.type, platform: a.platform && PLATFORMS.includes(a.platform) ? a.platform : '', label: { sync: '取链接', metrics: '采流量', doctor: '体检', board: '同步知识站数据', followers: '采粉丝', mark: '标记状态', login: '打开登录页', retry: '重跑平台' }[a.type] + (a.platform ? ` · ${NAMES[a.platform] || a.platform}` : ''), startedAt: new Date().toISOString(), done: false, ok: null, tail: '' };
       actions.push(rec);
       const ch = spawn(process.execPath, [path.join(DIR, 'hub.mjs'), ...argv], { cwd: ROOT, env: { ...process.env, HUB_NO_WEB: '1' } });
       const on = (d) => { rec.tail = (rec.tail + d).slice(-600); }; ch.stdout.on('data', on); ch.stderr.on('data', on);

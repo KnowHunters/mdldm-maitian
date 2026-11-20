@@ -8,12 +8,19 @@
 // 建课（上传成片）走发布插件里的站点适配器。
 import { config } from './feishu.mjs';
 
-const S = config.site && config.site.base ? config.site : null;
-export const SITE = S && {
-  name: S.name || '知识站',
-  base: S.base.replace(/\/$/, ''),
-  admin: S.base.replace(/\/$/, '') + (S.adminPath || '/admin'),
-  coursesApi: S.coursesApi || '/api/courses?admin=1',
-  dashboardApi: S.dashboardApi || '/api/admin/dashboard',
-  courseUrl: (c) => S.base.replace(/\/$/, '') + (S.coursePath || '/series/{seriesId}?courseId={id}').replace('{seriesId}', c.seriesId).replace('{id}', c.id || c._id),
-};
+export function siteEnabled(s = config.site) { return !!(s && s.base) && s.enabled !== false; }
+export function siteOn(s = config.site) { return !!(s && s.enabled !== false); }
+export function refreshSite() {
+  const s = siteEnabled() ? config.site : null;
+  SITE = s && {
+    name: s.name || '知识站',
+    base: s.base.replace(/\/$/, ''),
+    admin: s.base.replace(/\/$/, '') + (s.adminPath || '/admin'),
+    coursesApi: s.coursesApi || '/api/courses?admin=1',
+    dashboardApi: s.dashboardApi || '/api/admin/dashboard',
+    courseUrl: (c) => s.base.replace(/\/$/, '') + (s.coursePath || '/series/{seriesId}?courseId={id}').replace('{seriesId}', c.seriesId).replace('{id}', c.id || c._id),
+  };
+  return SITE;
+}
+export let SITE = null;
+SITE = refreshSite();
