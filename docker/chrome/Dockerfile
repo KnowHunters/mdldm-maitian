@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl wget xvfb x11vnc novnc websockify fluxbox procps lsof \
+ && apt-get install -y --no-install-recommends ca-certificates curl wget xvfb x11vnc novnc websockify fluxbox procps lsof fonts-noto-cjk fonts-noto-color-emoji fonts-wqy-microhei \
  && wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb \
  && apt-get install -y --no-install-recommends /tmp/chrome.deb \
  && rm -f /tmp/chrome.deb \
