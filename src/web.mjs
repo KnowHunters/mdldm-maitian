@@ -87,8 +87,11 @@ async function proxyChromeHttp(req, res, u) {
       const headers = {};
       for (const [key, value] of Object.entries(up.headers)) if (!HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) headers[key] = value;
       if (u.pathname === '/chrome/vnc.html' && up.statusCode === 200) {
-        const inject = `<script>(function(){var p=document.getElementById('noVNC_setting_path');if(p){p.value='chrome/websockify';p.dispatchEvent(new Event('change',{bubbles:true}));}var n=0;var t=setInterval(function(){var b=document.getElementById('noVNC_connect_button');if(b&&b.offsetParent!==null){var c=b.querySelector('div');(c||b).click();clearInterval(t);}else if(++n>100)clearInterval(t);},100);})();</script>`;
-        body = Buffer.from(body.toString('utf8').replace('</body>', inject + '</body>'));
+        let html = body.toString('utf8');
+        const queryIndex = u.pathname.indexOf('?');
+        if (queryIndex === -1) html = html.replace('<script src="app/error-handler.js"></script>', '<script>history.replaceState(null, "", location.pathname + "?path=" + encodeURIComponent("chrome/websockify") + "&autoconnect=1" + location.hash);</script><script src="app/error-handler.js"></script>');
+        const inject = `<script>(function(){var p=document.getElementById('noVNC_setting_path');if(p){p.value='chrome/websockify';p.dispatchEvent(new Event('change',{bubbles:true}));}})();</script>`;
+        body = Buffer.from(html.replace('</body>', inject + '</body>'));
         headers['content-type'] = 'text/html; charset=utf-8';
       }
       res.writeHead(up.statusCode || 502, headers);
