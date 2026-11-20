@@ -58,6 +58,41 @@ Chrome 策略会在首次启动时自动安装这两个扩展：
 - 「集成」保存飞书 webhook、测试发送、切换验证码登录；保存知识站配置、测试连接、开关知识站。
 - 配置写在 `maitian-data` 卷内的 `config.json`，容器启动不会覆盖已有配置。
 
+## 七个模块
+
+| 模块 | 现状 | Agent 能不能自动执行 |
+|---|---|---|
+| 写文案 | `skills/maitian-publish/SKILL.md` 定义发布素材格式；Agent 可生成文案、标签、封面建议和 `publish.json` | 能。由 Agent 生成文件；成片、封面和最终选题要人确认 |
+| 排计划 | `hub plan` 扫描 `publish.json`，写入分发计划；守护进程按定时触发 | 能。生成工程后可执行 `hub plan`；改期、删期要人决定 |
+| 发布助手 | 麦田助手扩展在统一 Chrome 里填写各平台上传页；国内四家填写后停下等人点发布，X/YouTube/Instagram/站点可自动提交 | 部分。填表、防重、自动提交可做；登录扫码、验证码、国内平台最后发布由人完成 |
+| 数据回来 | `hub metrics`、`hub followers` 由守护进程每天采集；新一期头 72 小时加密采样 | 能。采集、入库、日报自动执行；平台页面结构变化时要人修适配器 |
+| 自动复盘 | `review.mjs` 在发布后第 1/3/7 天出单期复盘，每周一出周报 | 能。无需人参与；数据不足时报告会标注或留空 |
+| 算转化 | `site_daily` 与 `site_campaigns` 记录注册、会员、订单、收入和 `utm_campaign` 归因；需要配置知识站 | 能。站点接口可用时自动采、自动归因；站点接口和登录态要人配置与维护 |
+| 出事提醒 | 飞书通知覆盖发布开始/结束、异常、登录过期、待发布提醒、体检、日报、复盘和周报 | 能。通知自动发送；webhook 和是否启用飞书登录由人配置 |
+
+操作顺序：
+
+```text
+看片/定题（人）
+  → Agent 写发布素材、生成 publish.json
+  → 人确认封面与文案
+  → Agent 执行 hub plan
+  → 守护进程 hub run（统一 Chrome 填写；必要时等人点发布）
+  → 守护进程 sync / metrics / followers / review / weekly
+  → 网页和飞书看结果
+```
+
+## X 长文 + 引用视频
+
+不建议在当前的 Docker 方案里实现。上游实现不是 `review` 功能，而是发布链路里的 `publish.json` 模式 `x.mode = "article+quote"`。它要求：
+
+- `config.plugin = "local"`，即作者本机插件环境；
+- 插件目录里有 `tools/x-article-quote.mjs`；
+- macOS 的 `open` 和 `caffeinate`；
+- 日常 Chrome 里的插件开发桥 `tools/bridge-server.mjs` 和端口 `8765`。
+
+当前方案使用服务器统一 Chrome 和商店版插件，没有这套本机开发桥。强行移植需要把插件仓库和桥接服务也塞进容器，并改写启动脚本；收益只有 X 的一种特殊发帖格式。普通 X 视频帖已经由发布助手支持，数据侧 `metrics.mjs` 也能读取长文链接并合并统计。建议保持普通视频帖模式，不整合长文自动发帖。
+
 PlayWriter 扩展连接地址：
 
 ```text
