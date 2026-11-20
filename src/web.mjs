@@ -60,6 +60,81 @@ async function chromeUp() {
   return false;
 }
 
+async function chromeVncUp() {
+  try { const r = await fetch('http://127.0.0.1:6080/vnc.html', { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; }
+}
+
+const HOP_HEADERS = new Set(['connection', 'proxy-connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'proxy-authenticate', 'proxy-authorization', 'content-length']);
+function chromeTarget(u) {
+  const path = u.pathname.replace(/^\/chrome\/?/, '');
+  return `/${path}${u.search}`;
+}
+
+async function proxyChromeHttp(req, res, u) {
+  if (u.pathname === '/chrome' || u.pathname === '/chrome/') {
+    return send(res, 302, '', 'text/plain', { location: '/chrome/vnc.html?path=' + encodeURIComponent('chrome/websockify') });
+  }
+  if (u.pathname !== '/chrome/vnc.html' && !u.pathname.startsWith('/chrome/app/') && !u.pathname.startsWith('/chrome/core/') && !u.pathname.startsWith('/chrome/vendor/') && !u.pathname.startsWith('/chrome/include/') && !u.pathname.startsWith('/chrome/utils/')) return send(res, 404, { error: 'not found' });
+  if (u.pathname === '/chrome/app/package.json') {
+    return send(res, 200, { version: '1.6.0' }, 'application/json');
+  }
+  const target = http.request({ hostname: '127.0.0.1', port: 6080, path: chromeTarget(u), method: req.method, headers: { ...req.headers, host: '127.0.0.1:6080' } });
+  target.on('response', (up) => {
+    const chunks = [];
+    up.on('data', (d) => chunks.push(d));
+    up.on('end', () => {
+      let body = Buffer.concat(chunks);
+      const headers = {};
+      for (const [key, value] of Object.entries(up.headers)) if (!HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) headers[key] = value;
+      if (u.pathname === '/chrome/vnc.html' && up.statusCode === 200) {
+        const inject = `<script>(function(){var p=document.getElementById('noVNC_setting_path');if(p){p.value='chrome/websockify';p.dispatchEvent(new Event('change',{bubbles:true}));}var n=0;var t=setInterval(function(){var b=document.getElementById('noVNC_connect_button');if(b&&b.offsetParent!==null){var c=b.querySelector('div');(c||b).click();clearInterval(t);}else if(++n>100)clearInterval(t);},100);})();</script>`;
+        body = Buffer.from(body.toString('utf8').replace('</body>', inject + '</body>'));
+        headers['content-type'] = 'text/html; charset=utf-8';
+      }
+      res.writeHead(up.statusCode || 502, headers);
+      res.end(req.method === 'HEAD' ? undefined : body);
+    });
+  });
+  target.on('error', () => { if (!res.headersSent) send(res, 502, { error: '远程 Chrome 没连上' }); else res.destroy(); });
+  target.end();
+}
+
+async function chromeAuthorized(req, u) {
+  if (!W.key) return true;
+  const cookieKey = ((req.headers.cookie || '').match(/mt_key=([^;]+)/) || [])[1];
+  if (cookieKey === W.key || u.searchParams.get('key') === W.key) return true;
+  if (await accessEmail(req, W.access)) return true;
+  if (W.login === 'feishu' && sessionOk(req)) return true;
+  return false;
+}
+
+async function proxyChromeUpgrade(req, socket, head) {
+  const u = new URL(req.url, 'http://x');
+  const deny = (code) => { socket.write(`HTTP/1.1 ${code} ${code === 401 ? 'Unauthorized' : 'Bad Request'}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); socket.destroy(); };
+  if (u.pathname !== '/chrome/websockify') return deny(400);
+  if (!await chromeAuthorized(req, u)) return deny(401);
+  try {
+    const origin = req.headers.origin && new URL(req.headers.origin).host;
+    if (origin && origin !== req.headers.host) return deny(401);
+  } catch { return deny(401); }
+  const headers = { ...req.headers, host: '127.0.0.1:6080' };
+  const target = http.request({ hostname: '127.0.0.1', port: 6080, path: '/websockify', method: 'GET', headers });
+  target.on('upgrade', (up, remote, remoteHead) => {
+    let reply = `HTTP/1.1 ${up.statusCode || 101} ${up.statusMessage || 'Switching Protocols'}\r\n`;
+    for (let i = 0; i < up.rawHeaders.length; i += 2) reply += `${up.rawHeaders[i]}: ${up.rawHeaders[i + 1]}\r\n`;
+    reply += '\r\n';
+    socket.write(reply);
+    if (remoteHead && remoteHead.length) socket.write(remoteHead);
+    if (head && head.length) remote.write(head);
+    remote.pipe(socket);
+    socket.pipe(remote);
+    const close = () => { remote.destroy(); socket.destroy(); };
+    remote.on('error', close); socket.on('error', close); remote.on('close', close); socket.on('close', close);
+  });
+  target.on('error', () => socket.destroy());
+  target.end();
+}
+
 function widgetScript(req, file) {
   let base = `${req.headers['x-forwarded-proto'] || (req.headers['cf-visitor'] ? 'https' : 'http')}://${req.headers.host}`;
   try { base = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'tunnel.json'), 'utf8')).base || base; } catch {}
@@ -145,6 +220,7 @@ async function handle(req, res) {
     if (!W.widgetToken) return send(res, 404, '<meta charset="utf-8">没配 config.web.widgetToken', 'text/html; charset=utf-8');
     return send(res, 200, widgetPage(widgetScript(req, 'maitian-loader.js')), 'text/html; charset=utf-8');
   }
+  if (u.pathname === '/chrome' || u.pathname.startsWith('/chrome/')) return proxyChromeHttp(req, res, u);
   if (u.pathname === '/api/overview') {
     return send(res, 200, { name: config.name || '麦田', siteOn: !!SITE, learn: learnOn(config) ? learnUrl('maitian-board') : '', siteName: SITE ? SITE.name : '', siteLogo: !!(SITE && config.site.logo), board: config.board && config.board.url, driver: config.driver,
       episodes: episodes().sort((a, b) => (b.episode || 0) - (a.episode || 0)).map(e => episodeView(e)), actions: actions.slice(-8).reverse(),
@@ -153,7 +229,7 @@ async function handle(req, res) {
       metrics: db.prepare('SELECT day, episode_id, platform, views FROM metrics ORDER BY day').all(),
       followers: db.prepare("SELECT day, platform, total, gain, loss, source FROM followers WHERE day >= date('now','localtime','-40 day') ORDER BY day").all(),
       samples: db.prepare('SELECT ts, episode_id, platform, views FROM samples ORDER BY ts').all(),
-      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || '']) ) }, now: new Date().toISOString() });
+      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), vnc: await chromeVncUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || '']) ) }, now: new Date().toISOString() });
   }
   if (u.pathname === '/site-logo') { const f = SITE && config.site.logo && path.resolve(ROOT, config.site.logo); return f && fs.existsSync(f) ? send(res, 200, fs.readFileSync(f), /\.svg$/.test(f) ? 'image/svg+xml' : /\.jpe?g$/.test(f) ? 'image/jpeg' : 'image/png', { 'cache-control': 'max-age=3600' }) : send(res, 404, ''); }
   if (u.pathname === '/api/episode') { const ep = getEpisode(u.searchParams.get('id')); return ep ? send(res, 200, episodeView(ep, true)) : send(res, 404, { error: '没有这一期' }); }
@@ -189,6 +265,7 @@ async function handle(req, res) {
 }
 export function startWeb() {
   const srv = http.createServer((req, res) => { handle(req, res).catch((e) => { try { send(res, 500, { error: e.message }); } catch {} }); });
+  srv.on('upgrade', (req, socket, head) => { proxyChromeUpgrade(req, socket, head).catch(() => socket.destroy()); });
   initLogin(ROOT);
   srv.listen(W.port, '0.0.0.0', () => console.log(`麦田网页：http://localhost:${W.port}/?key=${W.key}`));
   srv.on('error', (e) => console.error('麦田网页没起来：' + e.message));

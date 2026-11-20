@@ -41,13 +41,11 @@ docker compose ps
 docker compose logs -f chrome-unified
 ```
 
-`maitian`、`playwriter-relay` 与 `chrome-unified` 共用网络命名空间，因此 CDP 使用 `http://127.0.0.1:9222`。Chrome 的调试端口和 noVNC 只绑定本机，远程访问 noVNC 请用 SSH 隧道：
+`maitian`、`playwriter-relay` 与 `chrome-unified` 共用网络命名空间，因此 CDP 使用 `http://127.0.0.1:9222`。Chrome 的调试端口和 noVNC 只绑定服务器本机，不直接对外开放。
 
-```bash
-ssh -L 6080:127.0.0.1:6080 root@192.168.123.11
-```
+日常打开统一 Chrome：登录麦田网页，进入 **系统 → 打开远程 Chrome**。这个入口走麦田的 `8789` 端口和现有登录态，同源反向代理到 noVNC，不需要 SSH 隧道，也不会额外暴露 `6080`。远程桌面可用于扫码登录、处理验证和查看页面；登录态保存在服务器浏览器 Profile 中。
 
-浏览器打开 `http://127.0.0.1:6080/`。Chrome 策略会在首次启动时自动安装这两个扩展：
+Chrome 策略会在首次启动时自动安装这两个扩展：
 
 - 麦田发布助手：`eaaipbilkhibicihiollecmbpneikpnj`
 - PlayWriter：`jfeammnjpkecdekppnclgkkffahnhfhe`
