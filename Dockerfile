@@ -9,6 +9,7 @@ COPY package.json ./
 COPY src ./src
 COPY scripts ./scripts
 COPY skills ./skills
+COPY tests ./tests
 
 RUN mkdir -p /data/maitian /data/projects /data/chrome-profile
 ENV NODE_ENV=production \
