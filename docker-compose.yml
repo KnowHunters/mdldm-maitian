@@ -6,6 +6,10 @@ services:
     container_name: chrome-unified
     restart: unless-stopped
     init: true
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
     shm_size: 2gb
     environment:
       TZ: Asia/Shanghai
