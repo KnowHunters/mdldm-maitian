@@ -68,6 +68,10 @@ async function chromeVncUp() {
   try { const r = await fetch('http://127.0.0.1:6080/vnc.html', { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; }
 }
 
+async function creatorHubUp() {
+  try { const r = await fetch('http://127.0.0.1:8000/', { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; }
+}
+
 const HOP_HEADERS = new Set(['connection', 'proxy-connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'proxy-authenticate', 'proxy-authorization', 'content-length']);
 function chromeTarget(u) {
   const path = u.pathname.replace(/^\/chrome\/?/, '');
@@ -103,6 +107,20 @@ async function proxyChromeHttp(req, res, u) {
     });
   });
   target.on('error', () => { if (!res.headersSent) send(res, 502, { error: '远程 Chrome 没连上' }); else res.destroy(); });
+  target.end();
+}
+
+async function proxyCreatorHub(req, res, u) {
+  const targetPath = `/${u.pathname.replace(/^\/creatorhub\/?/, '')}${u.search}`;
+  const target = http.request({ hostname: '127.0.0.1', port: 8000, path: targetPath, method: req.method, headers: { ...req.headers, host: '127.0.0.1:8000' } });
+  target.on('response', (up) => {
+    const headers = {};
+    for (const [key, value] of Object.entries(up.headers)) if (!HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) headers[key] = value;
+    if (/^text\/html\b/.test(String(headers['content-type'] || ''))) headers['content-type'] = 'text/html; charset=utf-8';
+    res.writeHead(up.statusCode || 502, headers);
+    up.pipe(res);
+  });
+  target.on('error', () => { if (!res.headersSent) send(res, 502, { error: 'CreatorHub 没连上' }); else res.destroy(); });
   target.end();
 }
 
@@ -249,6 +267,7 @@ async function handle(req, res) {
     return send(res, 200, widgetPage(widgetScript(req, 'maitian-loader.js')), 'text/html; charset=utf-8');
   }
   if (u.pathname === '/chrome' || u.pathname.startsWith('/chrome/')) return proxyChromeHttp(req, res, u);
+  if (u.pathname === '/creatorhub' || u.pathname.startsWith('/creatorhub/')) return proxyCreatorHub(req, res, u);
   if (u.pathname === '/api/overview') {
     return send(res, 200, { name: config.name || '麦田', siteOn: !!SITE, learn: learnOn(config) ? learnUrl('maitian-board') : '', siteName: SITE ? SITE.name : '', siteLogo: !!(SITE && config.site.logo), board: config.board && config.board.url, driver: config.driver,
       episodes: episodes().sort((a, b) => (b.episode || 0) - (a.episode || 0)).map(e => episodeView(e)), actions: actions.slice(-8).reverse(),
@@ -257,7 +276,7 @@ async function handle(req, res) {
       metrics: db.prepare('SELECT day, episode_id, platform, views FROM metrics ORDER BY day').all(),
       followers: db.prepare("SELECT day, platform, total, gain, loss, source FROM followers WHERE day >= date('now','localtime','-40 day') ORDER BY day").all(),
       samples: db.prepare('SELECT ts, episode_id, platform, views FROM samples ORDER BY ts').all(),
-      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), vnc: await chromeVncUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || ''])), platforms: platformList() }, now: new Date().toISOString() });
+      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), vnc: await chromeVncUp(), creatorHub: await creatorHubUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', login: Object.fromEntries((config.keepAlive || []).map(k => [k, getMeta(`login:${k}`) || ''])), platforms: platformList() }, now: new Date().toISOString() });
   }
   if (u.pathname === '/site-logo') { const f = SITE && config.site.logo && path.resolve(ROOT, config.site.logo); return f && fs.existsSync(f) ? send(res, 200, fs.readFileSync(f), /\.svg$/.test(f) ? 'image/svg+xml' : /\.jpe?g$/.test(f) ? 'image/jpeg' : 'image/png', { 'cache-control': 'max-age=3600' }) : send(res, 404, ''); }
   if (u.pathname === '/api/integrations' && req.method === 'GET') return send(res, 200, integrations());

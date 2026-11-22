@@ -45,6 +45,8 @@ docker compose logs -f chrome-unified
 
 日常打开统一 Chrome：登录麦田网页，进入 **系统 → 打开远程 Chrome**。这个入口走麦田的 `8789` 端口和现有登录态，同源反向代理到 noVNC，不需要 SSH 隧道，也不会额外暴露 `6080`。远程桌面可用于扫码登录、处理验证和查看页面；登录态保存在服务器浏览器 Profile 中。
 
+CreatorHub 与统一 Chrome 共用网络命名空间，监听容器内的 `127.0.0.1:8000`。宿主机 `8000` 已被 Dtk API 占用，因此不再给 CreatorHub 单独映射端口；麦田网页提供同源代理入口：**系统 → 打开 CreatorHub**，地址是 `/creatorhub/`。这个入口复用麦田网页口令，不对外额外开放端口。
+
 Chrome 策略会在首次启动时自动安装这两个扩展：
 
 - 麦田发布助手：`eaaipbilkhibicihiollecmbpneikpnj`
