@@ -22,6 +22,7 @@ if [ ! -f "$PROFILE/First Run" ]; then touch "$PROFILE/First Run"; fi
 
 CHROME_ARGS=(
   --user-data-dir="$PROFILE"
+  --restore-last-session
   --no-first-run
   --no-default-browser-check
   --remote-debugging-address=0.0.0.0
@@ -36,9 +37,22 @@ if [ -n "${PLAYWRITER_EXTENSION_PATH:-}" ] && [ -d "${PLAYWRITER_EXTENSION_PATH}
   CHROME_ARGS+=(--disable-extensions-except="${PLAYWRITER_EXTENSION_PATH}" --load-extension="${PLAYWRITER_EXTENSION_PATH}")
 fi
 
-DISPLAY="${DISPLAY}" /usr/bin/google-chrome "${CHROME_ARGS[@]}" about:blank >/var/log/chrome.log 2>&1 &
+start_chrome() {
+  DISPLAY="${DISPLAY}" /usr/bin/google-chrome "${CHROME_ARGS[@]}" about:blank >>/var/log/chrome.log 2>&1 &
+  CHROME_PID=$!
+}
+
+start_chrome
 
 x11vnc -display "${DISPLAY}" -nopw -forever -shared -rfbport "${VNC_PORT}" >/var/log/x11vnc.log 2>&1 &
 websockify --web=/usr/share/novnc "${NOVNC_PORT}" "localhost:${VNC_PORT}" >/var/log/websockify.log 2>&1 &
 
-wait
+while true; do
+  if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+    echo "$(date -Is) chrome exited, restarting" >>/var/log/chrome.log
+    rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
+    sleep 2
+    start_chrome
+  fi
+  sleep 5
+done
