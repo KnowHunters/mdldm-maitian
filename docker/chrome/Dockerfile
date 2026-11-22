@@ -10,11 +10,12 @@ RUN apt-get update \
  && mkdir -p /chrome-profile /extensions
 
 RUN mkdir -p /etc/opt/chrome/policies/managed \
- && printf '%s\n' '{"ExtensionInstallForcelist":["eaaipbilkhibicihiollecmbpneikpnj;https://clients2.google.com/service/update2/crx","jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' \
+ && printf '%s\n' '{"ExtensionInstallForcelist":["eaaipbilkhibicihiollecmbpneikpnj;https://clients2.google.com/service/update2/crx","hlkenndednhfkekhgcdicdfddnkalmdm;https://clients2.google.com/service/update2/crx","jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' \
     > /etc/opt/chrome/policies/managed/extensions.json
 
 COPY entrypoint.sh /usr/local/bin/maitian-chrome-entrypoint
 COPY launch-wrapper.sh /usr/local/bin/maitian-chrome-launch
+COPY extensions/cookie-editor /extensions/cookie-editor
 RUN chmod +x /usr/local/bin/maitian-chrome-entrypoint /usr/local/bin/maitian-chrome-launch
 
 ENV DISPLAY=:99 \

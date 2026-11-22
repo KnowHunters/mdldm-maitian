@@ -9,6 +9,7 @@ CDP_PORT=${CDP_PORT:-9222}
 
 mkdir -p "$PROFILE" /tmp/.X11-unix
 chown -R chrome:chrome "$PROFILE" /extensions 2>/dev/null || true
+chmod -R a+rX /extensions 2>/dev/null || true
 rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
 rm -f "/tmp/.X${DISPLAY_NUM}-lock" "/tmp/.X11-unix/X${DISPLAY_NUM}"
 

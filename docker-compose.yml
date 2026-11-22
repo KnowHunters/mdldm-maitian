@@ -14,6 +14,7 @@ services:
       - chrome-profile:/chrome-profile
       - ./docker/chrome/extensions-policy.json:/etc/opt/chrome/policies/managed/extensions.json:ro
       - ./docker/chrome/launch-wrapper.sh:/usr/local/bin/maitian-chrome-launch:ro
+      - ./docker/chrome/extensions/cookie-editor:/extensions/cookie-editor:ro
     entrypoint: ["/usr/local/bin/maitian-chrome-launch"]
     ports:
       - "127.0.0.1:9222:9222"
